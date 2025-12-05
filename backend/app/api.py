@@ -144,7 +144,7 @@ def calculate_sample_size(req: SampleSizeRequest):
     """
     Returns required sample size per variant for an A/B proportion test,
     plus absolute and relative lift summaries.
-    
+
     If the required sample size exceeds 1,000,000 per variant, the response
     will indicate this via the exceedsMaxSampleSize flag.
     """
@@ -158,7 +158,7 @@ def calculate_sample_size(req: SampleSizeRequest):
 
     absolute_lift = req.comparisonPct - req.baselinePct
     relative_lift = (req.comparisonPct / req.baselinePct - 1.0) * 100.0
-    
+
     # Check if sample size exceeds the practical maximum
     exceeds_max = n_per_variant >= MAX_SAMPLE_SIZE_PER_VARIANT * 0.99  # 99% threshold
 
@@ -180,24 +180,24 @@ def get_mde_curve(req: MdeCurveRequest):
     """
     Returns data for plotting the trade-off between MDE (Minimum Detectable Effect)
     and required sample size.
-    
+
     Computes sample sizes for a range of relative lifts from 1% to 100%,
     showing how sample size requirements decrease as MDE increases.
     """
     import numpy as np
-    
+
     # Generate relative lift percentages from 1% to 100% (logarithmic scale for better distribution)
     relative_lifts = np.geomspace(1, 100, req.numPoints).tolist()
-    
+
     points = []
     for rel_lift in relative_lifts:
         # Calculate comparison rate from relative lift
         comparison_pct = req.baselinePct * (1 + rel_lift / 100.0)
-        
+
         # Skip if comparison would exceed 100%
         if comparison_pct >= 100:
             continue
-        
+
         # Calculate required sample size
         n_per_variant = ab_test_sample_size(
             baseline_pct=req.baselinePct,
@@ -206,20 +206,22 @@ def get_mde_curve(req: MdeCurveRequest):
             power=req.power,
             alternative=req.alternative,
         )
-        
+
         # Skip if sample size exceeds practical maximum
         if n_per_variant >= MAX_SAMPLE_SIZE_PER_VARIANT:
             continue
-        
+
         absolute_lift = comparison_pct - req.baselinePct
-        
-        points.append(MdeCurvePoint(
-            relativeLiftPct=rel_lift,
-            absoluteLiftPct=absolute_lift,
-            comparisonPct=comparison_pct,
-            sampleSizePerVariant=n_per_variant,
-        ))
-    
+
+        points.append(
+            MdeCurvePoint(
+                relativeLiftPct=rel_lift,
+                absoluteLiftPct=absolute_lift,
+                comparisonPct=comparison_pct,
+                sampleSizePerVariant=n_per_variant,
+            )
+        )
+
     return MdeCurveResponse(
         baselinePct=req.baselinePct,
         alpha=req.alpha,

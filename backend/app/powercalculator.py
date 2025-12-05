@@ -41,8 +41,8 @@ class PowerCurveResult:
     beta: float
     alpha: float
 
-    baseline: float          # p0 in 0–1
-    comparison: float        # p1 in 0–1
+    baseline: float  # p0 in 0–1
+    comparison: float  # p1 in 0–1
     sample_size_per_variant: int
 
 
@@ -76,7 +76,7 @@ def ab_test_sample_size(
     power : float
         Desired power (1 - beta).
     alternative : str
-        Type of test: "two-sided", "greater" (detect increase), 
+        Type of test: "two-sided", "greater" (detect increase),
         or "less" (detect decrease).
 
     Returns
@@ -96,11 +96,11 @@ def ab_test_sample_size(
     target_power = power
     MAX_SAMPLE_SIZE = 1_000_000.0
     low, high = 10.0, MAX_SAMPLE_SIZE  # reasonable bounds for per-variant n
-    
+
     # Binary search with 40 iterations gives precision of ~1000000 / 2^40 ≈ 0.001
     for _ in range(40):
         mid = (low + high) / 2.0
-        
+
         # Compute power with this sample size using the same model as power_curve
         result = power_curve_proportions(
             baseline_pct=baseline_pct,
@@ -110,12 +110,12 @@ def ab_test_sample_size(
             alternative=alternative,
             num_points=51,  # fewer points for speed during search
         )
-        
+
         if result.power >= target_power:
             high = mid
         else:
             low = mid
-    
+
     return high  # smallest n that reaches target power
 
 
@@ -155,7 +155,7 @@ def power_curve_proportions(
     alpha : float
         Significance level.
     alternative : str
-        Type of test: "two-sided", "greater" (detect increase), 
+        Type of test: "two-sided", "greater" (detect increase),
         or "less" (detect decrease).
     num_points : int
         Number of x points to compute for the curve.
@@ -191,7 +191,7 @@ def power_curve_proportions(
     # Map critical region back into conversion-rate space
     # and compute beta/power based on alternative hypothesis
     alt_dist = NormalDist(p1, se1)
-    
+
     if alternative == "two-sided":
         # Two-tailed: reject if observed is far from p0 in either direction
         crit_low = p0 - z_crit * se0
@@ -221,17 +221,23 @@ def power_curve_proportions(
     x_max = min(1.0, max(p0, p1) + 4.0 * se_max)
 
     x = np.linspace(x_min, x_max, num_points)
-    
+
     # Compute PDF using the normal distribution formula
     # PDF(x) = (1 / (σ * sqrt(2π))) * exp(-0.5 * ((x - μ) / σ)²)
-    null_pdf = np.array([
-        (1 / (se0 * math.sqrt(2 * math.pi))) * math.exp(-0.5 * ((xi - p0) / se0) ** 2)
-        for xi in x
-    ])
-    alt_pdf = np.array([
-        (1 / (se1 * math.sqrt(2 * math.pi))) * math.exp(-0.5 * ((xi - p1) / se1) ** 2)
-        for xi in x
-    ])
+    null_pdf = np.array(
+        [
+            (1 / (se0 * math.sqrt(2 * math.pi)))
+            * math.exp(-0.5 * ((xi - p0) / se0) ** 2)
+            for xi in x
+        ]
+    )
+    alt_pdf = np.array(
+        [
+            (1 / (se1 * math.sqrt(2 * math.pi)))
+            * math.exp(-0.5 * ((xi - p1) / se1) ** 2)
+            for xi in x
+        ]
+    )
 
     return PowerCurveResult(
         x=x,

@@ -53,6 +53,7 @@ export function AdvancedSettings({
   // Only sync if the change didn't originate from us
   useEffect(() => {
     if (Math.abs(desiredPower - lastSentPower.current) > 1e-4) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional sync from props
       setPowerInput(desiredPower)
     }
     lastSentPower.current = desiredPower
@@ -60,6 +61,7 @@ export function AdvancedSettings({
 
   useEffect(() => {
     if (Math.abs(alpha - lastSentAlpha.current) > 1e-4) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional sync from props
       setAlphaInput(alpha)
     }
     lastSentAlpha.current = alpha

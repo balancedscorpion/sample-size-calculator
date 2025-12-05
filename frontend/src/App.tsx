@@ -115,7 +115,7 @@ function App() {
           alternative,
         })
         setPowerCurveData(powerResult)
-      } catch (err) {
+      } catch {
         setError('Failed to update power curve with new sample size.')
       } finally {
         setIsLoading(false)

@@ -288,6 +288,7 @@ function PowerCurveChartComponent({ data, mdeCurveData, sampleSizeData, loading 
 
   useEffect(() => {
     if (!loading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Debounced loading indicator
       setShowOverlay(false)
       return
     }
