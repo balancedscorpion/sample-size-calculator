@@ -7,7 +7,8 @@ import type {
   SampleSizeResponse,
 } from './types'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// Use empty string for same-origin in production, localhost for development
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 async function apiCall<T>(endpoint: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
