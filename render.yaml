@@ -1,0 +1,17 @@
+# Render.com Blueprint for A/B Test Power Calculator
+# Deploy by connecting your repo and selecting this blueprint
+# Or use: render blueprint sync
+
+services:
+  - type: web
+    name: ab-test-calculator
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /docs
+    envVars:
+      - key: PORT
+        value: 10000
+    autoDeploy: true
+

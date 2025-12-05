@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# Dependencies (will be installed in container)
+node_modules
+backend/__pycache__
+backend/**/__pycache__
+**/*.pyc
+.venv
+
+# Build artifacts
+frontend/dist
+backend/htmlcov
+backend/coverage.xml
+backend/.coverage
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+backend/tests
+**/*.test.*
+**/*.spec.*
+
+# Misc
+*.log
+tmp
+.cache
+

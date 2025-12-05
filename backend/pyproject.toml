@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ab-power-calculator"
+version = "0.1.0"
+description = "A/B test sample-size and power-curve backend utilities."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Jamie Martin", email = "jamiejmartin2@gmail.com" }
+]
+
+dependencies = [
+  "numpy>=1.24,<3.0",
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30",
+]
+
+[tool.poetry]
+package-mode = false
+
+[project.optional-dependencies]
+dev = [
+  "uvicorn[standard]>=0.30",
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+  "httpx>=0.24",
+  "black>=24.0.0",
+  "mypy>=1.8.0",
+]
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
