@@ -1,32 +1,80 @@
-# A/B Test Power Calculator
+# A/B Test Sample Size Calculator
 
-An intuitive, non-technical-first power-curve visualization and sample-size planning toolkit. Built with a FastAPI backend and a React + TypeScript frontend featuring interactive charts.
+An intuitive, non-technical-first power analysis and sample size planning tool. Figure out exactly how many users you need to run a statistically valid experiment.
 
-## Project Structure
+![A/B Test Sample Size Calculator](screenshots/full-interface.png)
 
-- `backend/` – FastAPI service exposing `/power-curve` and `/sample-size` endpoints
-- `frontend/` – Vite + React SPA with responsive charts, plain-language forms, and live summaries
+## Features
+
+### Instant Sample Size Calculation
+
+Enter your baseline conversion rate and expected improvement to instantly see how many users you need per variant. The calculator shows both the per-variant sample size and total users required across both groups.
+
+###  Distribution Visualization
+
+Understand the statistics visually with interactive distribution charts showing what outcomes to expect:
+
+- **No effect distribution** (teal): What you'd observe if there's truly no difference
+- **Effect exists distribution** (orange): What you'd observe if your variant achieves the expected lift
+- **Critical thresholds**: Clear markers showing decision boundaries
+
+![Distribution of Outcomes](screenshots/distribution-outcomes.png)
+
+### Sensitivity Analysis
+
+Explore the trade-off between sample size and detectable effect size. See what minimum effect you can reliably detect at different traffic levels:
+
+- Toggle between **Relative %** and **Absolute percentage point** views
+- Interactive curve showing your current settings
+- Understand how more traffic lets you detect smaller effects
+
+![Sensitivity Analysis](screenshots/sensitivity-analysis.png)
+
+### Advanced Statistical Controls
+
+Fine-tune your experiment parameters with professional-grade options:
+
+| Option | Description |
+|--------|-------------|
+| **Statistical Power** | Chance of detecting a real effect (default: 80%) |
+| **Significance Level (α)** | False positive risk threshold (default: 5%) |
+| **Hypothesis Type** | Choose between two-tailed or one-tailed tests |
+| **Presets** | Quick access to Standard (80%/5%), Conservative (90%/1%), or Quick (70%/10%) configurations |
+
+### User-Friendly Design
+
+- **Plain-language labels**: No statistical jargon in the main interface
+- **Visual intuition**: See the overlap between null and alternative distributions
+- **Conversion-rate axis**: X-axis displays actual percentages, not z-scores
+- **Single-screen clarity**: All key information visible at once
+- **Real-time updates**: Results update instantly as you adjust parameters
 
 ---
 
-## Quick Start with Docker
+##  Quick Start
 
-The easiest way to run the full application locally:
+### Docker (Recommended)
+
+The easiest way to run the full application:
 
 ```bash
 # Build and run with Docker Compose
 docker compose up --build
-
-# Or build and run manually
-docker build -t ab-test-calculator .
-docker run -p 8000:8000 ab-test-calculator
 ```
 
 Open [http://localhost:8000](http://localhost:8000) in your browser.
 
+### Manual Build
+
+```bash
+# Build and run manually
+docker build -t ab-test-calculator .
+docker run -p 8000:8000 ab-test-calculator
+```
+
 ---
 
-## Deploy to Cloud Platforms
+## ☁️ Deploy to Cloud Platforms
 
 ### Railway
 
@@ -52,16 +100,11 @@ fly deploy
 
 ---
 
-## Local Development (without Docker)
+## 🛠️ Local Development
 
 ### Backend (FastAPI)
 
-### Prerequisites
-
-- Python 3.10+
-- Poetry (for dependency management)
-
-### Install & Run
+**Prerequisites:** Python 3.10+, Poetry
 
 ```bash
 cd backend
@@ -71,25 +114,16 @@ poetry run uvicorn app.api:app --reload --port 8000
 
 Open the interactive API docs at `http://127.0.0.1:8000/docs`.
 
-### API Endpoints
+#### API Endpoints
 
-| Endpoint | Body | Description |
-| --- | --- | --- |
-| `POST /power-curve` | `{ "baselinePct": 10, "comparisonPct": 12, "sampleSizePerVariant": 1000, "alpha": 0.05, "twoSided": true }` | Returns power, beta, critical values, and curve data for visualization. X-axis is in conversion rate (%). |
-| `POST /sample-size` | `{ "baselinePct": 10, "comparisonPct": 12, "alpha": 0.05, "power": 0.8 }` | Returns required sample size per variant plus absolute/relative lift metadata. |
+| Endpoint | Description |
+|----------|-------------|
+| `POST /power-curve` | Returns power, beta, critical values, and curve data for visualization |
+| `POST /sample-size` | Returns required sample size per variant plus lift metadata |
 
-Both endpoints accept `application/json` and respond with JSON.
+### Frontend (React + Vite)
 
----
-
-## Frontend (React + Vite)
-
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### Install & Run
+**Prerequisites:** Node.js 18+, npm
 
 ```bash
 cd frontend
@@ -97,15 +131,15 @@ npm install
 npm run dev
 ```
 
-By default the app calls `http://127.0.0.1:8000`. Override the backend URL by creating `frontend/.env` with:
+Override the backend URL by creating `frontend/.env`:
 
 ```
 VITE_API_BASE_URL=http://your-backend-host:8000
 ```
 
-### Production Build
+#### Production Build
 
-```
+```bash
 cd frontend
 npm run build
 npm run preview  # optional smoke test
@@ -113,33 +147,9 @@ npm run preview  # optional smoke test
 
 ---
 
-## Features
-
-### Non-Technical First Design
-
-- **Plain-language labels**: No jargon in the main interface
-- **Visual intuition**: Two overlapping distributions showing "what we'd see if there's no effect" vs "what we'd see if the uplift is real"
-- **Conversion-rate axis**: X-axis displays actual conversion percentages, not standardized test statistics
-- **Single-screen clarity**: All key information visible at once
-
-### Advanced Settings (for statisticians)
-
-- Toggle between one-sided and two-sided tests
-- Adjust significance level (α)
-- Override recommended sample size to explore power trade-offs
-
-### Interactive Visualization
-
-- Real-time power curve updates as you adjust parameters
-- Clear decision thresholds marked on the chart
-- Detailed interpretation panel explaining what the chart means
-- Metric summary cards showing sample size, power, and false positive rate
-
-## Testing
+## 🧪 Testing
 
 ### Backend Tests
-
-The backend has comprehensive unit and integration tests using pytest.
 
 ```bash
 cd backend
@@ -149,25 +159,56 @@ poetry run pytest
 
 See [`backend/TESTING.md`](backend/TESTING.md) for detailed testing documentation.
 
-### Test Coverage
+### Coverage
 
 - **Target**: >85% code coverage
 - **Current**: ~95% (core functions fully tested)
-- Tests run automatically on every push and pull request
 
 ### Continuous Integration
 
 GitHub Actions automatically runs tests before any merge to `main`:
-- ✅ Runs full test suite
-- ✅ Verifies code coverage threshold
-- ✅ Tests on Python 3.11
-- ✅ Generates coverage reports
+- ✅ Full test suite
+- ✅ Coverage verification
+- ✅ Python 3.11 compatibility
+- ✅ Coverage reports
 
-See [`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml) for CI configuration.
+---
 
-## Development Notes
+## 📁 Project Structure
 
-- CORS is enabled in the backend for local development
-- Both apps are independent; deploy the FastAPI service as an API and host the static frontend wherever you prefer
-- The frontend uses Recharts for the overlapping distributions and highlights rejection regions with clear visual cues
+```
+├── backend/           # FastAPI service
+│   ├── app/
+│   │   ├── api.py              # REST endpoints
+│   │   └── powercalculator.py  # Statistical calculations
+│   └── tests/                  # pytest test suite
+├── frontend/          # React + TypeScript SPA
+│   └── src/
+│       ├── components/         # UI components
+│       │   ├── ExperimentForm.tsx
+│       │   ├── MetricSummary.tsx
+│       │   ├── PowerCurveChart.tsx
+│       │   ├── MdeTradeoffChart.tsx
+│       │   └── AdvancedSettings.tsx
+│       └── App.tsx
+├── Dockerfile         # Multi-stage production build
+├── docker-compose.yml
+└── screenshots/       # Documentation images
+```
 
+---
+
+## 📝 License
+
+MIT
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please ensure tests pass before submitting a PR:
+
+```bash
+cd backend && poetry run pytest
+cd frontend && npm run lint
+```
