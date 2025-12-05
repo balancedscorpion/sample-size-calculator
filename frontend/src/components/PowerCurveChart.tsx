@@ -9,14 +9,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { PowerCurveResponse } from '../types'
+import type { MdeCurveResponse, PowerCurveResponse, SampleSizeResponse } from '../types'
+import { SensitivityChart } from './MdeTradeoffChart'
 
 interface PowerCurveChartProps {
   data: PowerCurveResponse | null
+  mdeCurveData: MdeCurveResponse | null
+  sampleSizeData: SampleSizeResponse | null
   loading: boolean
 }
 
-type ViewMode = 'simple' | 'detailed'
+type ViewMode = 'simple' | 'detailed' | 'sensitivity'
 
 function ChartTooltip({
   active,
@@ -46,9 +49,19 @@ function ChartTooltip({
   )
 }
 
+function HelpTooltip({ text }: { text: string }) {
+  return (
+    <span className="help-tooltip">
+      ?
+      <span className="help-tooltip-content">{text}</span>
+    </span>
+  )
+}
+
 function SimplePowerMeter({ data }: { data: PowerCurveResponse }) {
   const powerPct = data.power * 100
   const powerLevel = powerPct >= 80 ? 'high' : powerPct >= 60 ? 'medium' : 'low'
+  const alphaPct = (data.alpha * 100).toFixed(0)
   
   const getPowerDescription = () => {
     if (powerPct >= 80) {
@@ -89,6 +102,41 @@ function SimplePowerMeter({ data }: { data: PowerCurveResponse }) {
       </div>
       <div className="power-meter-description">
         {getPowerDescription()}
+      </div>
+
+      {/* Integrated Quick Reference */}
+      <div className="power-meter-reference">
+        <div className="reference-item">
+          <span className="reference-label">
+            Power
+            <HelpTooltip text="The probability of correctly detecting a real effect. Higher is better — 80% is the standard target." />
+          </span>
+          <span className="reference-value">{powerPct.toFixed(0)}%</span>
+        </div>
+        <div className="reference-item">
+          <span className="reference-label">
+            False positive risk
+            <HelpTooltip text="The probability of incorrectly declaring a winner when there's no real difference. 5% is the standard threshold." />
+          </span>
+          <span className="reference-value">{alphaPct}%</span>
+        </div>
+        {data.alternative === 'two-sided' ? (
+          <div className="reference-item">
+            <span className="reference-label">
+              Test type
+              <HelpTooltip text={`Two-tailed: detects both increases and decreases. Thresholds: ${data.critLowPct?.toFixed(2)}% - ${data.critHighPct?.toFixed(2)}%`} />
+            </span>
+            <span className="reference-value">Two-sided</span>
+          </div>
+        ) : (
+          <div className="reference-item">
+            <span className="reference-label">
+              Test type
+              <HelpTooltip text={`One-tailed: only detects ${data.alternative === 'greater' ? 'increases' : 'decreases'}.`} />
+            </span>
+            <span className="reference-value">One-sided</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -223,7 +271,18 @@ function DetailedChart({ data }: { data: PowerCurveResponse }) {
   )
 }
 
-function PowerCurveChartComponent({ data, loading }: PowerCurveChartProps) {
+function getViewTitle(viewMode: ViewMode): string {
+  switch (viewMode) {
+    case 'simple':
+      return 'Power Analysis'
+    case 'detailed':
+      return 'Distribution of Outcomes'
+    case 'sensitivity':
+      return 'Sensitivity Analysis'
+  }
+}
+
+function PowerCurveChartComponent({ data, mdeCurveData, sampleSizeData, loading }: PowerCurveChartProps) {
   const [showOverlay, setShowOverlay] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('simple')
 
@@ -267,31 +326,36 @@ function PowerCurveChartComponent({ data, loading }: PowerCurveChartProps) {
       )}
       
       <div className="chart-header">
-        <h3 className="chart-title">
-          {viewMode === 'simple' ? 'Power Analysis' : 'Distribution of Outcomes'}
-        </h3>
-        <div className="chart-view-toggle">
+        <h3 className="chart-title">{getViewTitle(viewMode)}</h3>
+        <div className="chart-view-toggle chart-view-toggle--three">
           <button
             type="button"
             className={`chart-view-btn ${viewMode === 'simple' ? 'chart-view-btn--active' : ''}`}
             onClick={() => setViewMode('simple')}
           >
-            Simple
+            Summary
           </button>
           <button
             type="button"
             className={`chart-view-btn ${viewMode === 'detailed' ? 'chart-view-btn--active' : ''}`}
             onClick={() => setViewMode('detailed')}
           >
-            Detailed
+            Distributions
+          </button>
+          <button
+            type="button"
+            className={`chart-view-btn ${viewMode === 'sensitivity' ? 'chart-view-btn--active' : ''}`}
+            onClick={() => setViewMode('sensitivity')}
+          >
+            Sensitivity
           </button>
         </div>
       </div>
 
-      {viewMode === 'simple' ? (
-        <SimplePowerMeter data={data} />
-      ) : (
-        <DetailedChart data={data} />
+      {viewMode === 'simple' && <SimplePowerMeter data={data} />}
+      {viewMode === 'detailed' && <DetailedChart data={data} />}
+      {viewMode === 'sensitivity' && (
+        <SensitivityChart data={mdeCurveData} sampleSizeData={sampleSizeData} />
       )}
     </div>
   )

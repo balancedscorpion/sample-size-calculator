@@ -9,6 +9,9 @@ POST /power-curve
 
 POST /sample-size
     -> required sample size per variant + lift summaries.
+
+POST /mde-curve
+    -> data for plotting sample size vs MDE trade-off curve.
 """
 
 from typing import List, Literal, Optional
@@ -71,6 +74,28 @@ class SampleSizeResponse(BaseModel):
     absoluteLiftPct: float
     relativeLiftPct: float
     exceedsMaxSampleSize: bool = False  # True if >1M per variant would be needed
+
+
+class MdeCurveRequest(BaseModel):
+    baselinePct: float = Field(..., gt=0, lt=100)
+    alpha: float = Field(0.05, gt=0, lt=1)
+    power: float = Field(0.8, gt=0, lt=1)
+    alternative: Alternative = "two-sided"
+    numPoints: int = Field(20, ge=5, le=50)
+
+
+class MdeCurvePoint(BaseModel):
+    relativeLiftPct: float  # e.g., 5, 10, 20
+    absoluteLiftPct: float  # e.g., 0.5, 1.0, 2.0
+    comparisonPct: float
+    sampleSizePerVariant: float
+
+
+class MdeCurveResponse(BaseModel):
+    baselinePct: float
+    alpha: float
+    power: float
+    points: List[MdeCurvePoint]
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +172,59 @@ def calculate_sample_size(req: SampleSizeRequest):
         absoluteLiftPct=absolute_lift,
         relativeLiftPct=relative_lift,
         exceedsMaxSampleSize=exceeds_max,
+    )
+
+
+@app.post("/mde-curve", response_model=MdeCurveResponse)
+def get_mde_curve(req: MdeCurveRequest):
+    """
+    Returns data for plotting the trade-off between MDE (Minimum Detectable Effect)
+    and required sample size.
+    
+    Computes sample sizes for a range of relative lifts from 1% to 100%,
+    showing how sample size requirements decrease as MDE increases.
+    """
+    import numpy as np
+    
+    # Generate relative lift percentages from 1% to 100% (logarithmic scale for better distribution)
+    relative_lifts = np.geomspace(1, 100, req.numPoints).tolist()
+    
+    points = []
+    for rel_lift in relative_lifts:
+        # Calculate comparison rate from relative lift
+        comparison_pct = req.baselinePct * (1 + rel_lift / 100.0)
+        
+        # Skip if comparison would exceed 100%
+        if comparison_pct >= 100:
+            continue
+        
+        # Calculate required sample size
+        n_per_variant = ab_test_sample_size(
+            baseline_pct=req.baselinePct,
+            comparison_pct=comparison_pct,
+            alpha=req.alpha,
+            power=req.power,
+            alternative=req.alternative,
+        )
+        
+        # Skip if sample size exceeds practical maximum
+        if n_per_variant >= MAX_SAMPLE_SIZE_PER_VARIANT:
+            continue
+        
+        absolute_lift = comparison_pct - req.baselinePct
+        
+        points.append(MdeCurvePoint(
+            relativeLiftPct=rel_lift,
+            absoluteLiftPct=absolute_lift,
+            comparisonPct=comparison_pct,
+            sampleSizePerVariant=n_per_variant,
+        ))
+    
+    return MdeCurveResponse(
+        baselinePct=req.baselinePct,
+        alpha=req.alpha,
+        power=req.power,
+        points=points,
     )
 
 

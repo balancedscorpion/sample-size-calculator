@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
-import { fetchPowerCurve, fetchSampleSize } from './api'
+import { fetchMdeCurve, fetchPowerCurve, fetchSampleSize } from './api'
 import { AdvancedSettings } from './components/AdvancedSettings'
 import { ExperimentForm } from './components/ExperimentForm'
-import { Interpretation } from './components/Interpretation'
 import { MetricSummary } from './components/MetricSummary'
 import { PowerCurveChart } from './components/PowerCurveChart'
-import type { Alternative, PowerCurveResponse, SampleSizeResponse } from './types'
+import type { Alternative, MdeCurveResponse, PowerCurveResponse, SampleSizeResponse } from './types'
 
 // Derive the alternative hypothesis from twoSided flag and comparison direction
 function getAlternative(twoSided: boolean, baselinePct: number, comparisonPct: number): Alternative {
@@ -28,6 +27,7 @@ function App() {
   // Results
   const [sampleSizeData, setSampleSizeData] = useState<SampleSizeResponse | null>(null)
   const [powerCurveData, setPowerCurveData] = useState<PowerCurveResponse | null>(null)
+  const [mdeCurveData, setMdeCurveData] = useState<MdeCurveResponse | null>(null)
   const [recommendedN, setRecommendedN] = useState<number | null>(null)
   const [sampleSizeOverride, setSampleSizeOverride] = useState<number | null>(null)
 
@@ -68,6 +68,17 @@ function App() {
       })
 
       setPowerCurveData(powerResult)
+
+      // Step 3: Get MDE trade-off curve
+      const mdeResult = await fetchMdeCurve({
+        baselinePct,
+        alpha,
+        power: desiredPower,
+        alternative,
+        numPoints: 25,
+      })
+
+      setMdeCurveData(mdeResult)
     } catch (err) {
       setError(
         err instanceof Error
@@ -151,9 +162,12 @@ function App() {
         <main className="app-main">
           <MetricSummary sampleSizeData={sampleSizeData} powerCurveData={powerCurveData} />
 
-          <PowerCurveChart data={powerCurveData} loading={isLoading} />
-
-          <Interpretation data={powerCurveData} />
+          <PowerCurveChart 
+            data={powerCurveData} 
+            mdeCurveData={mdeCurveData}
+            sampleSizeData={sampleSizeData}
+            loading={isLoading} 
+          />
         </main>
       </div>
     </div>

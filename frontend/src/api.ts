@@ -1,4 +1,6 @@
 import type {
+  MdeCurveRequest,
+  MdeCurveResponse,
   PowerCurveRequest,
   PowerCurveResponse,
   SampleSizeRequest,
@@ -34,4 +36,10 @@ export async function fetchPowerCurve(
   request: PowerCurveRequest
 ): Promise<PowerCurveResponse> {
   return apiCall<PowerCurveResponse>('/power-curve', request)
+}
+
+export async function fetchMdeCurve(
+  request: MdeCurveRequest
+): Promise<MdeCurveResponse> {
+  return apiCall<MdeCurveResponse>('/mde-curve', request)
 }

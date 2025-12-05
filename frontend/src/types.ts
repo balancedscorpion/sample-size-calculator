@@ -47,3 +47,28 @@ export interface SampleSizeResponse {
   relativeLiftPct: number
   exceedsMaxSampleSize: boolean
 }
+
+// Matches backend MdeCurveRequest
+export interface MdeCurveRequest {
+  baselinePct: number
+  alpha: number
+  power: number
+  alternative: Alternative
+  numPoints?: number
+}
+
+// Matches backend MdeCurvePoint
+export interface MdeCurvePoint {
+  relativeLiftPct: number
+  absoluteLiftPct: number
+  comparisonPct: number
+  sampleSizePerVariant: number
+}
+
+// Matches backend MdeCurveResponse
+export interface MdeCurveResponse {
+  baselinePct: number
+  alpha: number
+  power: number
+  points: MdeCurvePoint[]
+}
