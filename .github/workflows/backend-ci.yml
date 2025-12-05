@@ -1,85 +1,169 @@
 name: Backend CI
 
-# Run tests before merging to main
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master, develop]
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master, develop]
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
 
 jobs:
   test:
-    name: Run Tests
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-    
-    - name: Configure Poetry
-      run: |
-        poetry config virtualenvs.create true
-        poetry config virtualenvs.in-project true
-    
-    - name: Cache dependencies
-      uses: actions/cache@v4
-      with:
-        path: backend/.venv
-        key: venv-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
-        restore-keys: |
-          venv-${{ runner.os }}-
-    
-    - name: Install dependencies
-      working-directory: ./backend
-      run: poetry install --with dev
-    
-    - name: Run pytest
-      working-directory: ./backend
-      run: |
-        poetry run pytest \
-          --cov=app \
-          --cov-report=term-missing \
-          --cov-report=xml \
-          --cov-report=html \
-          -v
-    
-    - name: Verify coverage threshold
-      working-directory: ./backend
-      run: |
-        poetry run coverage report --fail-under=85
-    
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: coverage-reports
-        path: |
-          backend/coverage.xml
-          backend/htmlcov/
-        retention-days: 30
-    
-    - name: Test summary
-      if: always()
-      working-directory: ./backend
-      run: |
-        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        poetry run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        working-directory: ./backend
+        run: poetry install --no-interaction --with dev
+
+      - name: Run tests with coverage
+        working-directory: ./backend
+        run: |
+          poetry run pytest \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html \
+            -v
+
+      - name: Check coverage threshold
+        working-directory: ./backend
+        run: |
+          poetry run coverage report --fail-under=85
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-${{ matrix.python-version }}
+          fail_ci_if_error: false
+
+      - name: Upload coverage HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: backend/htmlcov/
+          retention-days: 30
+
+      - name: Test summary
+        if: always()
+        working-directory: ./backend
+        run: |
+          echo "## Test Results (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          poetry run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request' && matrix.python-version == '3.11'
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 90
+          MINIMUM_ORANGE: 80
+
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: poetry install --no-interaction --with dev
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff linter
+        working-directory: ./backend
+        run: ruff check app/ tests/
+
+      - name: Run ruff formatter check
+        working-directory: ./backend
+        run: ruff format --check app/ tests/
+
+      - name: Run black (code formatting check)
+        working-directory: ./backend
+        run: poetry run black --check app/ tests/
+
+      - name: Run mypy (type checking)
+        working-directory: ./backend
+        run: poetry run mypy app/ --ignore-missing-imports
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Export requirements
+        working-directory: ./backend
+        run: poetry export -f requirements.txt --output requirements.txt --without-hashes
+
+      - name: Run pip-audit for vulnerabilities
+        working-directory: ./backend
+        run: pip-audit -r requirements.txt --desc on
 
