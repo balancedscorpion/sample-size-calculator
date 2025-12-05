@@ -3,13 +3,22 @@ Production server that serves both the FastAPI backend and static frontend.
 Used when running in Docker or other containerized environments.
 """
 
+import logging
 import os
+import sys
 from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+
+# Configure logging to stdout (Railway/cloud platforms treat stderr as errors)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(message)s",
+    stream=sys.stdout,
+)
 
 # Import the existing API app
 from app.api import app
@@ -45,10 +54,17 @@ if STATIC_DIR.exists():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
+    
+    # Custom log config to use stdout instead of stderr
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["handlers"]["default"]["stream"] = "ext://sys.stdout"
+    log_config["handlers"]["access"]["stream"] = "ext://sys.stdout"
+    
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
         port=port,
         log_level="info",
+        log_config=log_config,
     )
 
