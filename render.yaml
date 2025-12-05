@@ -5,13 +5,13 @@
 services:
   - type: web
     name: ab-test-calculator
-    env: docker
+    runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: free
+    region: oregon
     healthCheckPath: /docs
     envVars:
       - key: PORT
         value: 10000
     autoDeploy: true
-
