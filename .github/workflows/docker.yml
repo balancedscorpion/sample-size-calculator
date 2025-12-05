@@ -74,7 +74,7 @@ jobs:
           docker build -t test-image .
           docker run -d --name test-container -p 8000:8000 -e PORT=8000 test-image
           sleep 10
-          curl -f http://localhost:8000/docs || (docker logs test-container && exit 1)
+          curl -f http://localhost:8000/health || (docker logs test-container && exit 1)
           docker stop test-container
 
       - name: Build summary
