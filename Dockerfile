@@ -27,6 +27,7 @@ RUN npm run build
 FROM python:3.11-slim AS production
 
 # Set environment variables
+# Note: PORT will be overridden by Railway/Render/Fly at runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000

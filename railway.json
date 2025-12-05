@@ -10,9 +10,5 @@
     "restartPolicyMaxRetries": 10,
     "healthcheckPath": "/docs",
     "healthcheckTimeout": 10
-  },
-  "networking": {
-    "servicePort": 8000,
-    "public": true
   }
 }
