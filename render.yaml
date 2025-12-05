@@ -10,7 +10,7 @@ services:
     dockerContext: .
     plan: free
     region: oregon
-    healthCheckPath: /docs
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 10000

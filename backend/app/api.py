@@ -114,6 +114,12 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health_check():
+    """Simple health check endpoint for container orchestration."""
+    return {"status": "healthy"}
+
+
 @app.post("/power-curve", response_model=PowerCurveResponse)
 def get_power_curve(payload: PowerCurveRequest):
     """
