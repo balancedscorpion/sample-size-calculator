@@ -26,6 +26,10 @@ package-mode = false
 ruff = "^0.14.8"
 black = "^25.11.0"
 mypy = "^1.19.0"
+pytest = "^8.0"
+pytest-cov = "^6.0"
+httpx = "^0.28"
+coverage = "^7.0"
 
 [project.optional-dependencies]
 dev = [
