@@ -7,7 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceDot,
   ReferenceLine,
 } from 'recharts'
 import type { MdeCurveResponse, SampleSizeResponse } from '../types'
