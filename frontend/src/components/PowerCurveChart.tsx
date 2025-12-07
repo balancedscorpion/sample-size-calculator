@@ -332,33 +332,15 @@ function DetailedChart({ data }: { data: PowerCurveResponse }) {
         </AreaChart>
       </ResponsiveContainer>
 
-      {/* CUPED Power Comparison Annotation */}
+      {/* CUPED Power Comparison - Subtle inline annotation */}
       {hasCupedComparison && data.comparisonPower != null && (
-        <div className="cuped-power-comparison">
-          <div className="cuped-power-comparison-header">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-            </svg>
-            <span>CUPED Impact</span>
-          </div>
-          <div className="cuped-power-comparison-content">
-            <div className="cuped-power-item cuped-power-item--with">
-              <span className="cuped-power-label">With CUPED</span>
-              <span className="cuped-power-value">{(data.power * 100).toFixed(0)}%</span>
-            </div>
-            <div className="cuped-power-arrow">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </div>
-            <div className="cuped-power-item cuped-power-item--without">
-              <span className="cuped-power-label">Without CUPED</span>
-              <span className="cuped-power-value">{(data.comparisonPower * 100).toFixed(0)}%</span>
-            </div>
-            <div className="cuped-power-gain">
-              +{((data.power - data.comparisonPower) * 100).toFixed(0)}pp
-            </div>
-          </div>
+        <div className="cuped-power-inline">
+          <span className="cuped-power-inline-label">Power:</span>
+          <span className="cuped-power-inline-with">{(data.power * 100).toFixed(0)}%</span>
+          <span className="cuped-power-inline-vs">vs</span>
+          <span className="cuped-power-inline-without">{(data.comparisonPower * 100).toFixed(0)}%</span>
+          <span className="cuped-power-inline-note">without CUPED</span>
+          <span className="cuped-power-inline-gain">(+{((data.power - data.comparisonPower) * 100).toFixed(0)}pp)</span>
         </div>
       )}
     </>

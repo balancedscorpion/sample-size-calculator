@@ -208,15 +208,24 @@ function SensitivityChartComponent({ data, sampleSizeData }: SensitivityChartPro
 
           <Tooltip content={<ChartTooltip liftMode={liftMode} />} />
 
-          {/* "Without CUPED" reference line - shown first so it appears behind */}
+          {/* "Without CUPED" reference lines - shown first so they appear behind */}
           {hasCuped && sampleSizeData && (
-            <ReferenceLine
-              y={liftWithoutCuped}
-              stroke="#fca5a5"
-              strokeDasharray="2 2"
-              strokeWidth={1.5}
-              strokeOpacity={0.8}
-            />
+            <>
+              <ReferenceLine
+                x={currentSampleSize}
+                stroke="#fca5a5"
+                strokeDasharray="2 2"
+                strokeWidth={1.5}
+                strokeOpacity={0.6}
+              />
+              <ReferenceLine
+                y={liftWithoutCuped}
+                stroke="#fca5a5"
+                strokeDasharray="2 2"
+                strokeWidth={1.5}
+                strokeOpacity={0.8}
+              />
+            </>
           )}
 
           {/* Current position reference lines (with CUPED) */}
@@ -298,31 +307,50 @@ function SensitivityChartComponent({ data, sampleSizeData }: SensitivityChartPro
       </ResponsiveContainer>
 
       {sampleSizeData && (
-        <div className="sensitivity-current">
-          <div className="sensitivity-current-marker" />
-          <span className="sensitivity-current-text">
-            <strong>With CUPED:</strong>{' '}
-            {Math.round(sampleSizeData.sampleSizePerVariant).toLocaleString()} users/variant{' '}
-            detects{' '}
-            {liftMode === 'relative' 
-              ? `${sampleSizeData.relativeLiftPct.toFixed(1)}%`
-              : `${sampleSizeData.absoluteLiftPct.toFixed(2)}pp`
-            }{' '}lift
-          </span>
-        </div>
-      )}
-
-      {hasCuped && sampleSizeData && (
-        <div className="sensitivity-current sensitivity-current--without-cuped">
-          <div className="sensitivity-current-marker sensitivity-current-marker--without-cuped" />
-          <span className="sensitivity-current-text">
-            <strong>Without CUPED:</strong>{' '}
-            Same traffic would only detect{' '}
-            {liftMode === 'relative' 
-              ? `${liftWithoutCuped.toFixed(1)}%`
-              : `${liftWithoutCuped.toFixed(2)}pp`
-            }{' '}lift
-          </span>
+        <div className="sensitivity-summary">
+          <div className="sensitivity-summary-row">
+            <span className="sensitivity-summary-label">Sample size</span>
+            <span className="sensitivity-summary-value">
+              {Math.round(sampleSizeData.sampleSizePerVariant).toLocaleString()}/variant
+            </span>
+          </div>
+          <div className="sensitivity-summary-row sensitivity-summary-row--highlight">
+            <span className="sensitivity-summary-label">
+              <span className="sensitivity-marker sensitivity-marker--with" />
+              Detects with CUPED
+            </span>
+            <span className="sensitivity-summary-value sensitivity-summary-value--with">
+              {liftMode === 'relative' 
+                ? `${currentLift.toFixed(1)}%`
+                : `${currentLift.toFixed(2)}pp`
+              }
+            </span>
+          </div>
+          {hasCuped && (
+            <div className="sensitivity-summary-row">
+              <span className="sensitivity-summary-label">
+                <span className="sensitivity-marker sensitivity-marker--without" />
+                Detects without CUPED
+              </span>
+              <span className="sensitivity-summary-value sensitivity-summary-value--without">
+                {liftMode === 'relative' 
+                  ? `${liftWithoutCuped.toFixed(1)}%`
+                  : `${liftWithoutCuped.toFixed(2)}pp`
+                }
+              </span>
+            </div>
+          )}
+          {hasCuped && (
+            <div className="sensitivity-summary-row sensitivity-summary-row--improvement">
+              <span className="sensitivity-summary-label">CUPED improvement</span>
+              <span className="sensitivity-summary-value sensitivity-summary-value--improvement">
+                {liftMode === 'relative' 
+                  ? `${(liftWithoutCuped - currentLift).toFixed(1)}%`
+                  : `${(liftWithoutCuped - currentLift).toFixed(2)}pp`
+                } smaller MDE
+              </span>
+            </div>
+          )}
         </div>
       )}
 
