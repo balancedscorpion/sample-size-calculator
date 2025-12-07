@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.powercalculator import (
     ab_test_sample_size,
+    cuped_variance_reduction_pct,
     power_curve_payload,
 )
 
@@ -39,6 +40,7 @@ class PowerCurveRequest(BaseModel):
     sampleSizePerVariant: int = Field(..., gt=0)
     alpha: float = Field(0.05, gt=0, lt=1)
     alternative: Alternative = "two-sided"
+    preExperimentCorrelation: float = Field(0.0, ge=0, lt=1)
 
 
 class PowerCurveResponse(BaseModel):
@@ -54,6 +56,8 @@ class PowerCurveResponse(BaseModel):
     nullPdf: List[float]
     altPdf: List[float]
     alternative: Alternative
+    preExperimentCorrelation: float = 0.0
+    varianceReductionPct: float = 0.0
 
 
 class SampleSizeRequest(BaseModel):
@@ -62,6 +66,7 @@ class SampleSizeRequest(BaseModel):
     alpha: float = Field(0.05, gt=0, lt=1)
     power: float = Field(0.8, gt=0, lt=1)
     alternative: Alternative = "two-sided"
+    preExperimentCorrelation: float = Field(0.0, ge=0, lt=1)
 
 
 class SampleSizeResponse(BaseModel):
@@ -74,6 +79,8 @@ class SampleSizeResponse(BaseModel):
     absoluteLiftPct: float
     relativeLiftPct: float
     exceedsMaxSampleSize: bool = False  # True if >1M per variant would be needed
+    preExperimentCorrelation: float = 0.0
+    varianceReductionPct: float = 0.0
 
 
 class MdeCurveRequest(BaseModel):
@@ -82,6 +89,7 @@ class MdeCurveRequest(BaseModel):
     power: float = Field(0.8, gt=0, lt=1)
     alternative: Alternative = "two-sided"
     numPoints: int = Field(20, ge=5, le=50)
+    preExperimentCorrelation: float = Field(0.0, ge=0, lt=1)
 
 
 class MdeCurvePoint(BaseModel):
@@ -131,6 +139,9 @@ def get_power_curve(payload: PowerCurveRequest):
 
     The x-axis (`xPct`) is in percent units, matching baseline /
     comparison inputs.
+
+    When preExperimentCorrelation > 0, CUPED variance reduction is applied,
+    resulting in tighter distributions and higher power.
     """
     result = power_curve_payload(
         baseline_pct=payload.baselinePct,
@@ -138,6 +149,7 @@ def get_power_curve(payload: PowerCurveRequest):
         sample_size_per_variant=payload.sampleSizePerVariant,
         alpha=payload.alpha,
         alternative=payload.alternative,
+        pre_experiment_correlation=payload.preExperimentCorrelation,
     )
     return result
 
@@ -153,6 +165,9 @@ def calculate_sample_size(req: SampleSizeRequest):
 
     If the required sample size exceeds 1,000,000 per variant, the response
     will indicate this via the exceedsMaxSampleSize flag.
+
+    When preExperimentCorrelation > 0, CUPED variance reduction is applied,
+    reducing the required sample size.
     """
     n_per_variant = ab_test_sample_size(
         baseline_pct=req.baselinePct,
@@ -160,6 +175,7 @@ def calculate_sample_size(req: SampleSizeRequest):
         alpha=req.alpha,
         power=req.power,
         alternative=req.alternative,
+        pre_experiment_correlation=req.preExperimentCorrelation,
     )
 
     absolute_lift = req.comparisonPct - req.baselinePct
@@ -167,6 +183,9 @@ def calculate_sample_size(req: SampleSizeRequest):
 
     # Check if sample size exceeds the practical maximum
     exceeds_max = n_per_variant >= MAX_SAMPLE_SIZE_PER_VARIANT * 0.99  # 99% threshold
+
+    # Calculate variance reduction percentage for display
+    variance_reduction = cuped_variance_reduction_pct(req.preExperimentCorrelation)
 
     return SampleSizeResponse(
         baselinePct=req.baselinePct,
@@ -178,6 +197,8 @@ def calculate_sample_size(req: SampleSizeRequest):
         absoluteLiftPct=absolute_lift,
         relativeLiftPct=relative_lift,
         exceedsMaxSampleSize=exceeds_max,
+        preExperimentCorrelation=req.preExperimentCorrelation,
+        varianceReductionPct=variance_reduction,
     )
 
 
@@ -189,6 +210,9 @@ def get_mde_curve(req: MdeCurveRequest):
 
     Computes sample sizes for a range of relative lifts from 1% to 100%,
     showing how sample size requirements decrease as MDE increases.
+
+    When preExperimentCorrelation > 0, CUPED variance reduction is applied,
+    reducing the required sample sizes across all MDE values.
     """
     import numpy as np
 
@@ -204,13 +228,14 @@ def get_mde_curve(req: MdeCurveRequest):
         if comparison_pct >= 100:
             continue
 
-        # Calculate required sample size
+        # Calculate required sample size (with CUPED if correlation provided)
         n_per_variant = ab_test_sample_size(
             baseline_pct=req.baselinePct,
             comparison_pct=comparison_pct,
             alpha=req.alpha,
             power=req.power,
             alternative=req.alternative,
+            pre_experiment_correlation=req.preExperimentCorrelation,
         )
 
         # Skip if sample size exceeds practical maximum

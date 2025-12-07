@@ -8,6 +8,7 @@ export interface PowerCurveRequest {
   sampleSizePerVariant: number
   alpha: number
   alternative: Alternative
+  preExperimentCorrelation?: number
 }
 
 // Matches backend PowerCurveResponse
@@ -24,6 +25,8 @@ export interface PowerCurveResponse {
   nullPdf: number[]
   altPdf: number[]
   alternative: Alternative
+  preExperimentCorrelation: number
+  varianceReductionPct: number
 }
 
 // Matches backend SampleSizeRequest
@@ -33,6 +36,7 @@ export interface SampleSizeRequest {
   alpha: number
   power: number
   alternative: Alternative
+  preExperimentCorrelation?: number
 }
 
 // Matches backend SampleSizeResponse
@@ -46,6 +50,8 @@ export interface SampleSizeResponse {
   absoluteLiftPct: number
   relativeLiftPct: number
   exceedsMaxSampleSize: boolean
+  preExperimentCorrelation: number
+  varianceReductionPct: number
 }
 
 // Matches backend MdeCurveRequest
@@ -55,6 +61,7 @@ export interface MdeCurveRequest {
   power: number
   alternative: Alternative
   numPoints?: number
+  preExperimentCorrelation?: number
 }
 
 // Matches backend MdeCurvePoint
