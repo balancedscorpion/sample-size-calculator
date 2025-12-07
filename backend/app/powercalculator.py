@@ -349,33 +349,140 @@ def power_curve_payload(
     """
     Convenience wrapper returning a JSON-serializable dict for APIs/front-end.
     All values that represent rates are exposed in percent (0–100).
+    
+    When CUPED is enabled (pre_experiment_correlation > 0), also computes
+    comparison data showing what the distributions would look like without CUPED
+    at the SAME sample size. All PDFs are computed over a unified x-axis.
     """
-    result = power_curve_proportions(
-        baseline_pct=baseline_pct,
-        comparison_pct=comparison_pct,
-        sample_size_per_variant=sample_size_per_variant,
-        alpha=alpha,
-        alternative=alternative,
-        num_points=num_points,
-        pre_experiment_correlation=pre_experiment_correlation,
-    )
-
     def to_pct(v: Optional[float]) -> Optional[float]:
         return None if v is None else v * 100.0
-
-    return {
-        "alpha": result.alpha,
+    
+    p0 = baseline_pct / 100.0
+    p1 = comparison_pct / 100.0
+    n = float(sample_size_per_variant)
+    
+    # Calculate raw standard errors (without CUPED)
+    se0_raw = np.sqrt(p0 * (1.0 - p0) / n)
+    se1_raw = np.sqrt(p1 * (1.0 - p1) / n)
+    
+    # Calculate CUPED-adjusted standard errors
+    cuped_factor = cuped_variance_reduction_factor(pre_experiment_correlation)
+    se0_cuped = se0_raw * cuped_factor
+    se1_cuped = se1_raw * cuped_factor
+    variance_reduction = cuped_variance_reduction_pct(pre_experiment_correlation)
+    
+    # Critical value(s) in z-space
+    std_norm = NormalDist(0, 1)
+    if alternative == "two-sided":
+        z_crit = std_norm.inv_cdf(1.0 - alpha / 2.0)
+    else:
+        z_crit = std_norm.inv_cdf(1.0 - alpha)
+    
+    # Compute critical thresholds and power WITH CUPED
+    if alternative == "two-sided":
+        crit_low_cuped = p0 - z_crit * se0_cuped
+        crit_high_cuped = p0 + z_crit * se0_cuped
+        alt_dist_cuped = NormalDist(p1, se1_cuped)
+        beta_cuped = alt_dist_cuped.cdf(crit_high_cuped) - alt_dist_cuped.cdf(crit_low_cuped)
+    elif alternative == "greater":
+        crit_low_cuped = None
+        crit_high_cuped = p0 + z_crit * se0_cuped
+        alt_dist_cuped = NormalDist(p1, se1_cuped)
+        beta_cuped = alt_dist_cuped.cdf(crit_high_cuped)
+    else:  # alternative == "less"
+        crit_low_cuped = p0 - z_crit * se0_cuped
+        crit_high_cuped = None
+        alt_dist_cuped = NormalDist(p1, se1_cuped)
+        beta_cuped = 1.0 - alt_dist_cuped.cdf(crit_low_cuped)
+    
+    beta_cuped = float(np.clip(beta_cuped, 0.0, 1.0))
+    power_cuped = 1.0 - beta_cuped
+    
+    # When CUPED is enabled, use the LARGER (raw) SEs to determine x-axis range
+    # This ensures the wider non-CUPED distributions aren't clipped
+    if pre_experiment_correlation > 0:
+        se_max_for_range = max(se0_raw, se1_raw)
+    else:
+        se_max_for_range = max(se0_cuped, se1_cuped)
+    
+    x_min = max(0.0, min(p0, p1) - 4.0 * se_max_for_range)
+    x_max = min(1.0, max(p0, p1) + 4.0 * se_max_for_range)
+    x = np.linspace(x_min, x_max, num_points)
+    
+    # Compute PDFs with CUPED over the unified x-axis
+    null_pdf = np.array([
+        (1 / (se0_cuped * math.sqrt(2 * math.pi)))
+        * math.exp(-0.5 * ((xi - p0) / se0_cuped) ** 2)
+        for xi in x
+    ])
+    alt_pdf = np.array([
+        (1 / (se1_cuped * math.sqrt(2 * math.pi)))
+        * math.exp(-0.5 * ((xi - p1) / se1_cuped) ** 2)
+        for xi in x
+    ])
+    
+    payload = {
+        "alpha": alpha,
         "baselinePct": baseline_pct,
         "comparisonPct": comparison_pct,
-        "sampleSizePerVariant": result.sample_size_per_variant,
-        "power": result.power,
-        "beta": result.beta,
-        "critLowPct": to_pct(result.crit_low),
-        "critHighPct": to_pct(result.crit_high),
-        "xPct": (result.x * 100.0).tolist(),
-        "nullPdf": result.null_pdf.tolist(),
-        "altPdf": result.alt_pdf.tolist(),
+        "sampleSizePerVariant": sample_size_per_variant,
+        "power": power_cuped,
+        "beta": beta_cuped,
+        "critLowPct": to_pct(crit_low_cuped),
+        "critHighPct": to_pct(crit_high_cuped),
+        "xPct": (x * 100.0).tolist(),
+        "nullPdf": null_pdf.tolist(),
+        "altPdf": alt_pdf.tolist(),
         "alternative": alternative,
-        "preExperimentCorrelation": result.pre_experiment_correlation,
-        "varianceReductionPct": result.variance_reduction_pct,
+        "preExperimentCorrelation": pre_experiment_correlation,
+        "varianceReductionPct": variance_reduction,
+        # Comparison fields - populated when CUPED is enabled
+        "comparisonNullPdf": None,
+        "comparisonAltPdf": None,
+        "comparisonCritLowPct": None,
+        "comparisonCritHighPct": None,
+        "comparisonPower": None,
     }
+    
+    # If CUPED is enabled, compute comparison data WITHOUT CUPED
+    # using the SAME x-axis and SAME sample size
+    if pre_experiment_correlation > 0:
+        # Compute critical thresholds and power WITHOUT CUPED
+        if alternative == "two-sided":
+            crit_low_raw = p0 - z_crit * se0_raw
+            crit_high_raw = p0 + z_crit * se0_raw
+            alt_dist_raw = NormalDist(p1, se1_raw)
+            beta_raw = alt_dist_raw.cdf(crit_high_raw) - alt_dist_raw.cdf(crit_low_raw)
+        elif alternative == "greater":
+            crit_low_raw = None
+            crit_high_raw = p0 + z_crit * se0_raw
+            alt_dist_raw = NormalDist(p1, se1_raw)
+            beta_raw = alt_dist_raw.cdf(crit_high_raw)
+        else:  # alternative == "less"
+            crit_low_raw = p0 - z_crit * se0_raw
+            crit_high_raw = None
+            alt_dist_raw = NormalDist(p1, se1_raw)
+            beta_raw = 1.0 - alt_dist_raw.cdf(crit_low_raw)
+        
+        beta_raw = float(np.clip(beta_raw, 0.0, 1.0))
+        power_raw = 1.0 - beta_raw
+        
+        # Compute PDFs WITHOUT CUPED over the SAME x-axis
+        comparison_null_pdf = np.array([
+            (1 / (se0_raw * math.sqrt(2 * math.pi)))
+            * math.exp(-0.5 * ((xi - p0) / se0_raw) ** 2)
+            for xi in x
+        ])
+        comparison_alt_pdf = np.array([
+            (1 / (se1_raw * math.sqrt(2 * math.pi)))
+            * math.exp(-0.5 * ((xi - p1) / se1_raw) ** 2)
+            for xi in x
+        ])
+        
+        payload["comparisonNullPdf"] = comparison_null_pdf.tolist()
+        payload["comparisonAltPdf"] = comparison_alt_pdf.tolist()
+        payload["comparisonCritLowPct"] = to_pct(crit_low_raw)
+        payload["comparisonCritHighPct"] = to_pct(crit_high_raw)
+        payload["comparisonPower"] = power_raw
+    
+    return payload

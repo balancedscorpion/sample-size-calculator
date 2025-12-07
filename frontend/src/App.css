@@ -791,6 +791,21 @@ input.input-error:focus {
   background: var(--color-accent);
 }
 
+.legend-swatch--dotted {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-slate-400) 0px,
+    var(--color-slate-400) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.legend-item--comparison {
+  color: var(--color-slate-500);
+  font-style: italic;
+}
+
 .chart-placeholder {
   background: linear-gradient(to bottom, var(--color-slate-50), white);
   border: 2px dashed var(--color-slate-300);
@@ -1242,6 +1257,17 @@ input.input-error:focus {
   color: var(--color-slate-900);
 }
 
+.sensitivity-current--without-cuped {
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, rgba(252, 165, 165, 0.15) 0%, rgba(252, 165, 165, 0.08) 100%);
+  border: 1px solid rgba(252, 165, 165, 0.4);
+}
+
+.sensitivity-current-marker--without-cuped {
+  background: #fca5a5;
+  box-shadow: 0 0 0 1px rgba(252, 165, 165, 0.4);
+}
+
 .sensitivity-hint {
   display: flex;
   align-items: center;
@@ -1470,4 +1496,88 @@ input.input-error:focus {
 
 .cuped-learn-link svg {
   flex-shrink: 0;
+}
+
+/* CUPED Power Comparison in Chart */
+.cuped-power-comparison {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(13, 148, 136, 0.04) 100%);
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  border-radius: 10px;
+}
+
+.cuped-power-comparison-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cuped-power-comparison-header svg {
+  flex-shrink: 0;
+}
+
+.cuped-power-comparison-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.cuped-power-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  min-width: 100px;
+}
+
+.cuped-power-item--with {
+  background: rgba(13, 148, 136, 0.12);
+}
+
+.cuped-power-item--without {
+  background: var(--color-slate-100);
+}
+
+.cuped-power-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-slate-500);
+}
+
+.cuped-power-value {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-slate-800);
+}
+
+.cuped-power-item--with .cuped-power-value {
+  color: var(--color-primary);
+}
+
+.cuped-power-arrow {
+  display: flex;
+  align-items: center;
+  color: var(--color-slate-400);
+  transform: rotate(180deg);
+}
+
+.cuped-power-gain {
+  padding: 0.375rem 0.75rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
 }

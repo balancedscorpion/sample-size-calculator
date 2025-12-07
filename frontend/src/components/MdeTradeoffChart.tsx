@@ -79,6 +79,14 @@ function SensitivityChartComponent({ data, sampleSizeData }: SensitivityChartPro
     ? sampleSizeData?.relativeLiftPct ?? 0
     : sampleSizeData?.absoluteLiftPct ?? 0
 
+  // Calculate "without CUPED" MDE at the same sample size
+  // Without CUPED, MDE is larger by factor 1/sqrt(1 - ρ²)
+  const hasCuped = (sampleSizeData?.preExperimentCorrelation ?? 0) > 0
+  const cupedFactor = hasCuped 
+    ? Math.sqrt(1 - Math.pow(sampleSizeData?.preExperimentCorrelation ?? 0, 2))
+    : 1
+  const liftWithoutCuped = hasCuped ? currentLift / cupedFactor : 0
+
   // Calculate zoomed domain: 0.25x to 4x of current sample size
   const minSampleSize = Math.max(100, Math.floor(currentSampleSize * 0.25))
   const maxSampleSize = Math.ceil(currentSampleSize * 4)
@@ -200,7 +208,18 @@ function SensitivityChartComponent({ data, sampleSizeData }: SensitivityChartPro
 
           <Tooltip content={<ChartTooltip liftMode={liftMode} />} />
 
-          {/* Current position reference lines */}
+          {/* "Without CUPED" reference line - shown first so it appears behind */}
+          {hasCuped && sampleSizeData && (
+            <ReferenceLine
+              y={liftWithoutCuped}
+              stroke="#fca5a5"
+              strokeDasharray="2 2"
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+            />
+          )}
+
+          {/* Current position reference lines (with CUPED) */}
           {sampleSizeData && (
             <>
               <ReferenceLine
@@ -282,12 +301,26 @@ function SensitivityChartComponent({ data, sampleSizeData }: SensitivityChartPro
         <div className="sensitivity-current">
           <div className="sensitivity-current-marker" />
           <span className="sensitivity-current-text">
-            <strong>Your settings:</strong>{' '}
+            <strong>With CUPED:</strong>{' '}
             {Math.round(sampleSizeData.sampleSizePerVariant).toLocaleString()} users/variant{' '}
             detects{' '}
             {liftMode === 'relative' 
               ? `${sampleSizeData.relativeLiftPct.toFixed(1)}%`
               : `${sampleSizeData.absoluteLiftPct.toFixed(2)}pp`
+            }{' '}lift
+          </span>
+        </div>
+      )}
+
+      {hasCuped && sampleSizeData && (
+        <div className="sensitivity-current sensitivity-current--without-cuped">
+          <div className="sensitivity-current-marker sensitivity-current-marker--without-cuped" />
+          <span className="sensitivity-current-text">
+            <strong>Without CUPED:</strong>{' '}
+            Same traffic would only detect{' '}
+            {liftMode === 'relative' 
+              ? `${liftWithoutCuped.toFixed(1)}%`
+              : `${liftWithoutCuped.toFixed(2)}pp`
             }{' '}lift
           </span>
         </div>

@@ -27,6 +27,13 @@ export interface PowerCurveResponse {
   alternative: Alternative
   preExperimentCorrelation: number
   varianceReductionPct: number
+  
+  // Comparison data (without CUPED) - only populated when CUPED is enabled
+  comparisonNullPdf?: number[]
+  comparisonAltPdf?: number[]
+  comparisonCritLowPct?: number | null
+  comparisonCritHighPct?: number | null
+  comparisonPower?: number
 }
 
 // Matches backend SampleSizeRequest

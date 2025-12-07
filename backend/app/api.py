@@ -58,6 +58,13 @@ class PowerCurveResponse(BaseModel):
     alternative: Alternative
     preExperimentCorrelation: float = 0.0
     varianceReductionPct: float = 0.0
+    
+    # Comparison data (without CUPED) - only populated when CUPED is enabled
+    comparisonNullPdf: Optional[List[float]] = None
+    comparisonAltPdf: Optional[List[float]] = None
+    comparisonCritLowPct: Optional[float] = None
+    comparisonCritHighPct: Optional[float] = None
+    comparisonPower: Optional[float] = None
 
 
 class SampleSizeRequest(BaseModel):
