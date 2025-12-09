@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import './App.css'
 import { fetchMdeCurve, fetchPowerCurve, fetchSampleSize } from './api'
 import { AdvancedSettings } from './components/AdvancedSettings'
@@ -23,6 +24,10 @@ function App() {
   const [desiredPower, setDesiredPower] = useState(0.8)
   const [alpha, setAlpha] = useState(0.05)
   const [twoSided, setTwoSided] = useState(true)
+  
+  // CUPED state
+  const [cupedEnabled, setCupedEnabled] = useState(false)
+  const [preExperimentCorrelation, setPreExperimentCorrelation] = useState(0.5)
 
   // Results
   const [sampleSizeData, setSampleSizeData] = useState<SampleSizeResponse | null>(null)
@@ -43,6 +48,9 @@ function App() {
     setIsLoading(true)
     setError(null)
 
+    // Include CUPED correlation if enabled
+    const cupedCorrelation = cupedEnabled ? preExperimentCorrelation : 0
+
     try {
       // Step 1: Get recommended sample size
       const sampleResult = await fetchSampleSize({
@@ -51,6 +59,7 @@ function App() {
         alpha,
         power: desiredPower,
         alternative,
+        preExperimentCorrelation: cupedCorrelation,
       })
 
       setSampleSizeData(sampleResult)
@@ -65,6 +74,7 @@ function App() {
         sampleSizePerVariant: n,
         alpha,
         alternative,
+        preExperimentCorrelation: cupedCorrelation,
       })
 
       setPowerCurveData(powerResult)
@@ -76,6 +86,7 @@ function App() {
         power: desiredPower,
         alternative,
         numPoints: 25,
+        preExperimentCorrelation: cupedCorrelation,
       })
 
       setMdeCurveData(mdeResult)
@@ -88,7 +99,7 @@ function App() {
     } finally {
       setIsLoading(false)
     }
-  }, [baselinePct, comparisonPct, desiredPower, alpha, twoSided])
+  }, [baselinePct, comparisonPct, desiredPower, alpha, twoSided, cupedEnabled, preExperimentCorrelation])
 
   // Trigger calculation when inputs change
   useEffect(() => {
@@ -104,6 +115,7 @@ function App() {
 
     if (newN && sampleSizeData) {
       const alternative = getAlternative(twoSided, sampleSizeData.baselinePct, sampleSizeData.comparisonPct)
+      const cupedCorrelation = cupedEnabled ? preExperimentCorrelation : 0
       
       setIsLoading(true)
       try {
@@ -113,6 +125,7 @@ function App() {
           sampleSizePerVariant: newN,
           alpha,
           alternative,
+          preExperimentCorrelation: cupedCorrelation,
         })
         setPowerCurveData(powerResult)
       } catch {
@@ -126,6 +139,11 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
+        <div className="app-header-nav">
+          <Link to="/cuped" className="header-cuped-link">
+            Learn about CUPED →
+          </Link>
+        </div>
         <h1>A/B Test Sample Size Calculator</h1>
         <p className="app-subtitle">
           Figure out how many users you need to run a statistically valid experiment.
@@ -155,6 +173,10 @@ function App() {
               sampleSizeOverride={sampleSizeOverride}
               recommendedSampleSize={recommendedN}
               onSampleSizeOverrideChange={handleSampleSizeOverride}
+              cupedEnabled={cupedEnabled}
+              onCupedEnabledChange={setCupedEnabled}
+              preExperimentCorrelation={preExperimentCorrelation}
+              onPreExperimentCorrelationChange={setPreExperimentCorrelation}
             />
           </div>
         </aside>

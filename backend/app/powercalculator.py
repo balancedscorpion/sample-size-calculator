@@ -13,6 +13,11 @@ The `alternative` parameter controls the type of test:
 - "two-sided": detect any change (increase or decrease)
 - "greater": one-sided test detecting an increase (p1 > p0)
 - "less": one-sided test detecting a decrease (p1 < p0)
+
+CUPED (Controlled-experiment Using Pre-Experiment Data):
+When a pre-experiment correlation (ρ) is provided, variance is reduced by
+a factor of (1 - ρ²). This allows detecting smaller effects with the same
+sample size, or achieving the same power with fewer samples.
 """
 
 from dataclasses import dataclass
@@ -23,6 +28,59 @@ import math
 import numpy as np
 
 Alternative = Literal["two-sided", "greater", "less"]
+
+
+# ---------------------------------------------------------------------------
+# CUPED variance reduction helper
+# ---------------------------------------------------------------------------
+
+
+def cuped_variance_reduction_factor(correlation: float) -> float:
+    """
+    Calculate the variance reduction factor from CUPED.
+    
+    CUPED reduces variance by factor (1 - ρ²), so the standard error
+    is multiplied by sqrt(1 - ρ²).
+    
+    Parameters
+    ----------
+    correlation : float
+        Pearson correlation (ρ) between pre-experiment covariate and
+        experiment outcome. Must be in range [0, 1).
+        
+    Returns
+    -------
+    float
+        Factor to multiply standard error by. Returns 1.0 if correlation
+        is 0 (no reduction), approaches 0 as correlation approaches 1.
+    """
+    if correlation < 0 or correlation >= 1:
+        if correlation == 0:
+            return 1.0
+        raise ValueError("correlation must be in range [0, 1)")
+    
+    # Variance is reduced by (1 - ρ²), so SE is multiplied by sqrt(1 - ρ²)
+    return math.sqrt(1.0 - correlation ** 2)
+
+
+def cuped_variance_reduction_pct(correlation: float) -> float:
+    """
+    Calculate the percentage of variance reduced by CUPED.
+    
+    Parameters
+    ----------
+    correlation : float
+        Pearson correlation (ρ) between pre-experiment covariate and
+        experiment outcome.
+        
+    Returns
+    -------
+    float
+        Percentage of variance reduced (0-100). E.g., ρ=0.7 returns ~51%.
+    """
+    if correlation <= 0:
+        return 0.0
+    return (1.0 - (1.0 - correlation ** 2)) * 100.0  # = ρ² * 100
 
 
 @dataclass
@@ -44,6 +102,10 @@ class PowerCurveResult:
     baseline: float  # p0 in 0–1
     comparison: float  # p1 in 0–1
     sample_size_per_variant: int
+    
+    # CUPED parameters
+    pre_experiment_correlation: float = 0.0
+    variance_reduction_pct: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +119,7 @@ def ab_test_sample_size(
     alpha: float = 0.05,
     power: float = 0.8,
     alternative: Alternative = "two-sided",
+    pre_experiment_correlation: float = 0.0,
 ) -> float:
     """
     Sample size per variant for a two-sample proportion test.
@@ -78,6 +141,10 @@ def ab_test_sample_size(
     alternative : str
         Type of test: "two-sided", "greater" (detect increase),
         or "less" (detect decrease).
+    pre_experiment_correlation : float
+        Correlation between pre-experiment covariate and outcome (0-1).
+        When > 0, CUPED variance reduction is applied, reducing required
+        sample size.
 
     Returns
     -------
@@ -109,6 +176,7 @@ def ab_test_sample_size(
             alpha=alpha,
             alternative=alternative,
             num_points=51,  # fewer points for speed during search
+            pre_experiment_correlation=pre_experiment_correlation,
         )
 
         if result.power >= target_power:
@@ -131,6 +199,7 @@ def power_curve_proportions(
     alpha: float = 0.05,
     alternative: Alternative = "two-sided",
     num_points: int = 201,
+    pre_experiment_correlation: float = 0.0,
 ) -> PowerCurveResult:
     """
     Compute power curve for an A/B proportion test, expressed in terms of
@@ -140,6 +209,9 @@ def power_curve_proportions(
     We model:
         p_hat | H0 ~ N(p0, p0(1-p0)/n)
         p_hat | H1 ~ N(p1, p1(1-p1)/n)
+
+    When CUPED is enabled (pre_experiment_correlation > 0), variance is
+    reduced by factor (1 - ρ²), resulting in tighter distributions.
 
     Critical region is defined in z-space and mapped back to conversion
     rate units.
@@ -159,6 +231,9 @@ def power_curve_proportions(
         or "less" (detect decrease).
     num_points : int
         Number of x points to compute for the curve.
+    pre_experiment_correlation : float
+        Correlation between pre-experiment covariate and outcome (0-1).
+        When > 0, CUPED variance reduction is applied.
 
     Returns
     -------
@@ -178,8 +253,14 @@ def power_curve_proportions(
     n = float(sample_size_per_variant)
 
     # Standard errors of the sample proportion under H0 and H1
-    se0 = np.sqrt(p0 * (1.0 - p0) / n)
-    se1 = np.sqrt(p1 * (1.0 - p1) / n)
+    se0_raw = np.sqrt(p0 * (1.0 - p0) / n)
+    se1_raw = np.sqrt(p1 * (1.0 - p1) / n)
+    
+    # Apply CUPED variance reduction if correlation is provided
+    cuped_factor = cuped_variance_reduction_factor(pre_experiment_correlation)
+    se0 = se0_raw * cuped_factor
+    se1 = se1_raw * cuped_factor
+    variance_reduction = cuped_variance_reduction_pct(pre_experiment_correlation)
 
     # Critical value(s) in z-space
     std_norm = NormalDist(0, 1)
@@ -251,6 +332,8 @@ def power_curve_proportions(
         baseline=p0,
         comparison=p1,
         sample_size_per_variant=sample_size_per_variant,
+        pre_experiment_correlation=pre_experiment_correlation,
+        variance_reduction_pct=variance_reduction,
     )
 
 
@@ -261,34 +344,145 @@ def power_curve_payload(
     alpha: float = 0.05,
     alternative: Alternative = "two-sided",
     num_points: int = 201,
+    pre_experiment_correlation: float = 0.0,
 ) -> Dict:
     """
     Convenience wrapper returning a JSON-serializable dict for APIs/front-end.
     All values that represent rates are exposed in percent (0–100).
+    
+    When CUPED is enabled (pre_experiment_correlation > 0), also computes
+    comparison data showing what the distributions would look like without CUPED
+    at the SAME sample size. All PDFs are computed over a unified x-axis.
     """
-    result = power_curve_proportions(
-        baseline_pct=baseline_pct,
-        comparison_pct=comparison_pct,
-        sample_size_per_variant=sample_size_per_variant,
-        alpha=alpha,
-        alternative=alternative,
-        num_points=num_points,
-    )
-
     def to_pct(v: Optional[float]) -> Optional[float]:
         return None if v is None else v * 100.0
-
-    return {
-        "alpha": result.alpha,
+    
+    p0 = baseline_pct / 100.0
+    p1 = comparison_pct / 100.0
+    n = float(sample_size_per_variant)
+    
+    # Calculate raw standard errors (without CUPED)
+    se0_raw = np.sqrt(p0 * (1.0 - p0) / n)
+    se1_raw = np.sqrt(p1 * (1.0 - p1) / n)
+    
+    # Calculate CUPED-adjusted standard errors
+    cuped_factor = cuped_variance_reduction_factor(pre_experiment_correlation)
+    se0_cuped = se0_raw * cuped_factor
+    se1_cuped = se1_raw * cuped_factor
+    variance_reduction = cuped_variance_reduction_pct(pre_experiment_correlation)
+    
+    # Critical value(s) in z-space
+    std_norm = NormalDist(0, 1)
+    if alternative == "two-sided":
+        z_crit = std_norm.inv_cdf(1.0 - alpha / 2.0)
+    else:
+        z_crit = std_norm.inv_cdf(1.0 - alpha)
+    
+    # Compute critical thresholds and power WITH CUPED
+    if alternative == "two-sided":
+        crit_low_cuped = p0 - z_crit * se0_cuped
+        crit_high_cuped = p0 + z_crit * se0_cuped
+        alt_dist_cuped = NormalDist(p1, se1_cuped)
+        beta_cuped = alt_dist_cuped.cdf(crit_high_cuped) - alt_dist_cuped.cdf(crit_low_cuped)
+    elif alternative == "greater":
+        crit_low_cuped = None
+        crit_high_cuped = p0 + z_crit * se0_cuped
+        alt_dist_cuped = NormalDist(p1, se1_cuped)
+        beta_cuped = alt_dist_cuped.cdf(crit_high_cuped)
+    else:  # alternative == "less"
+        crit_low_cuped = p0 - z_crit * se0_cuped
+        crit_high_cuped = None
+        alt_dist_cuped = NormalDist(p1, se1_cuped)
+        beta_cuped = 1.0 - alt_dist_cuped.cdf(crit_low_cuped)
+    
+    beta_cuped = float(np.clip(beta_cuped, 0.0, 1.0))
+    power_cuped = 1.0 - beta_cuped
+    
+    # When CUPED is enabled, use the LARGER (raw) SEs to determine x-axis range
+    # This ensures the wider non-CUPED distributions aren't clipped
+    if pre_experiment_correlation > 0:
+        se_max_for_range = max(se0_raw, se1_raw)
+    else:
+        se_max_for_range = max(se0_cuped, se1_cuped)
+    
+    x_min = max(0.0, min(p0, p1) - 4.0 * se_max_for_range)
+    x_max = min(1.0, max(p0, p1) + 4.0 * se_max_for_range)
+    x = np.linspace(x_min, x_max, num_points)
+    
+    # Compute PDFs with CUPED over the unified x-axis
+    null_pdf = np.array([
+        (1 / (se0_cuped * math.sqrt(2 * math.pi)))
+        * math.exp(-0.5 * ((xi - p0) / se0_cuped) ** 2)
+        for xi in x
+    ])
+    alt_pdf = np.array([
+        (1 / (se1_cuped * math.sqrt(2 * math.pi)))
+        * math.exp(-0.5 * ((xi - p1) / se1_cuped) ** 2)
+        for xi in x
+    ])
+    
+    payload = {
+        "alpha": alpha,
         "baselinePct": baseline_pct,
         "comparisonPct": comparison_pct,
-        "sampleSizePerVariant": result.sample_size_per_variant,
-        "power": result.power,
-        "beta": result.beta,
-        "critLowPct": to_pct(result.crit_low),
-        "critHighPct": to_pct(result.crit_high),
-        "xPct": (result.x * 100.0).tolist(),
-        "nullPdf": result.null_pdf.tolist(),
-        "altPdf": result.alt_pdf.tolist(),
+        "sampleSizePerVariant": sample_size_per_variant,
+        "power": power_cuped,
+        "beta": beta_cuped,
+        "critLowPct": to_pct(crit_low_cuped),
+        "critHighPct": to_pct(crit_high_cuped),
+        "xPct": (x * 100.0).tolist(),
+        "nullPdf": null_pdf.tolist(),
+        "altPdf": alt_pdf.tolist(),
         "alternative": alternative,
+        "preExperimentCorrelation": pre_experiment_correlation,
+        "varianceReductionPct": variance_reduction,
+        # Comparison fields - populated when CUPED is enabled
+        "comparisonNullPdf": None,
+        "comparisonAltPdf": None,
+        "comparisonCritLowPct": None,
+        "comparisonCritHighPct": None,
+        "comparisonPower": None,
     }
+    
+    # If CUPED is enabled, compute comparison data WITHOUT CUPED
+    # using the SAME x-axis and SAME sample size
+    if pre_experiment_correlation > 0:
+        # Compute critical thresholds and power WITHOUT CUPED
+        if alternative == "two-sided":
+            crit_low_raw = p0 - z_crit * se0_raw
+            crit_high_raw = p0 + z_crit * se0_raw
+            alt_dist_raw = NormalDist(p1, se1_raw)
+            beta_raw = alt_dist_raw.cdf(crit_high_raw) - alt_dist_raw.cdf(crit_low_raw)
+        elif alternative == "greater":
+            crit_low_raw = None
+            crit_high_raw = p0 + z_crit * se0_raw
+            alt_dist_raw = NormalDist(p1, se1_raw)
+            beta_raw = alt_dist_raw.cdf(crit_high_raw)
+        else:  # alternative == "less"
+            crit_low_raw = p0 - z_crit * se0_raw
+            crit_high_raw = None
+            alt_dist_raw = NormalDist(p1, se1_raw)
+            beta_raw = 1.0 - alt_dist_raw.cdf(crit_low_raw)
+        
+        beta_raw = float(np.clip(beta_raw, 0.0, 1.0))
+        power_raw = 1.0 - beta_raw
+        
+        # Compute PDFs WITHOUT CUPED over the SAME x-axis
+        comparison_null_pdf = np.array([
+            (1 / (se0_raw * math.sqrt(2 * math.pi)))
+            * math.exp(-0.5 * ((xi - p0) / se0_raw) ** 2)
+            for xi in x
+        ])
+        comparison_alt_pdf = np.array([
+            (1 / (se1_raw * math.sqrt(2 * math.pi)))
+            * math.exp(-0.5 * ((xi - p1) / se1_raw) ** 2)
+            for xi in x
+        ])
+        
+        payload["comparisonNullPdf"] = comparison_null_pdf.tolist()
+        payload["comparisonAltPdf"] = comparison_alt_pdf.tolist()
+        payload["comparisonCritLowPct"] = to_pct(crit_low_raw)
+        payload["comparisonCritHighPct"] = to_pct(crit_high_raw)
+        payload["comparisonPower"] = power_raw
+    
+    return payload

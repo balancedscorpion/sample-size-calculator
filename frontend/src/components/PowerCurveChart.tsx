@@ -143,10 +143,15 @@ function SimplePowerMeter({ data }: { data: PowerCurveResponse }) {
 }
 
 function DetailedChart({ data }: { data: PowerCurveResponse }) {
+  const hasCupedComparison = data.comparisonNullPdf && data.comparisonAltPdf
+  
   const points = data.xPct.map((x, i) => ({
     x,
     nullPdf: data.nullPdf[i],
     altPdf: data.altPdf[i],
+    // Include comparison data (without CUPED) if available
+    comparisonNullPdf: data.comparisonNullPdf?.[i],
+    comparisonAltPdf: data.comparisonAltPdf?.[i],
   }))
 
   const xMin = Math.min(...data.xPct)
@@ -163,6 +168,12 @@ function DetailedChart({ data }: { data: PowerCurveResponse }) {
           <span className="legend-swatch legend-swatch--alt" />
           <span>Effect exists ({data.comparisonPct.toFixed(1)}%)</span>
         </div>
+        {hasCupedComparison && (
+          <div className="legend-item legend-item--comparison">
+            <span className="legend-swatch legend-swatch--dotted" />
+            <span>Without CUPED</span>
+          </div>
+        )}
       </div>
 
       <ResponsiveContainer width="100%" height={360}>
@@ -209,7 +220,28 @@ function DetailedChart({ data }: { data: PowerCurveResponse }) {
 
           <Tooltip content={<ChartTooltip />} />
 
-          {/* Decision threshold line(s) */}
+          {/* Comparison threshold lines (without CUPED) - shown first so they appear behind */}
+          {hasCupedComparison && data.comparisonCritHighPct != null && (
+            <ReferenceLine
+              x={data.comparisonCritHighPct}
+              stroke="#fca5a5"
+              strokeDasharray="2 2"
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+            />
+          )}
+
+          {hasCupedComparison && data.comparisonCritLowPct != null && (
+            <ReferenceLine
+              x={data.comparisonCritLowPct}
+              stroke="#fca5a5"
+              strokeDasharray="2 2"
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+            />
+          )}
+
+          {/* Decision threshold line(s) with CUPED */}
           {data.critHighPct !== null && (
             <ReferenceLine
               x={data.critHighPct}
@@ -244,6 +276,38 @@ function DetailedChart({ data }: { data: PowerCurveResponse }) {
             />
           )}
 
+          {/* Comparison distributions (without CUPED) - dotted, no fill */}
+          {hasCupedComparison && (
+            <Area
+              type="monotone"
+              dataKey="comparisonNullPdf"
+              stroke="#0d9488"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              strokeOpacity={0.5}
+              fill="none"
+              isAnimationActive={true}
+              animationDuration={800}
+              animationEasing="ease-in-out"
+            />
+          )}
+
+          {hasCupedComparison && (
+            <Area
+              type="monotone"
+              dataKey="comparisonAltPdf"
+              stroke="#f59e0b"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              strokeOpacity={0.5}
+              fill="none"
+              isAnimationActive={true}
+              animationDuration={800}
+              animationEasing="ease-in-out"
+            />
+          )}
+
+          {/* Main distributions (with CUPED) - solid lines with gradient fill */}
           <Area
             type="monotone"
             dataKey="nullPdf"
@@ -267,6 +331,18 @@ function DetailedChart({ data }: { data: PowerCurveResponse }) {
           />
         </AreaChart>
       </ResponsiveContainer>
+
+      {/* CUPED Power Comparison - Subtle inline annotation */}
+      {hasCupedComparison && data.comparisonPower != null && (
+        <div className="cuped-power-inline">
+          <span className="cuped-power-inline-label">Power:</span>
+          <span className="cuped-power-inline-with">{(data.power * 100).toFixed(0)}%</span>
+          <span className="cuped-power-inline-vs">vs</span>
+          <span className="cuped-power-inline-without">{(data.comparisonPower * 100).toFixed(0)}%</span>
+          <span className="cuped-power-inline-note">without CUPED</span>
+          <span className="cuped-power-inline-gain">(+{((data.power - data.comparisonPower) * 100).toFixed(0)}pp)</span>
+        </div>
+      )}
     </>
   )
 }
